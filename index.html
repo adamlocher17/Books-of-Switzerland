@@ -135,12 +135,15 @@
     ];
 
     let currentBookId = null;
+    let isRestoring = false;
+    let currentPdf = null;
+    
     const container = document.getElementById('pdf-container');
     const loadingMsg = document.getElementById('loading-msg');
 
-    // Save scroll position automatically while reading
+    // 1. Save scroll position (unless the book is currently loading)
     container.addEventListener('scroll', () => {
-      if (currentBookId) {
+      if (currentBookId && !isRestoring) {
         localStorage.setItem(`scroll_${currentBookId}`, container.scrollTop);
       }
     });
@@ -157,48 +160,76 @@
       });
     }
 
+    // 2. Lazy Loader: Only draws the pages that are currently on the screen
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const canvas = entry.target;
+          if (!canvas.dataset.rendered && currentPdf) {
+            canvas.dataset.rendered = "true";
+            renderPageOnCanvas(canvas, parseInt(canvas.dataset.pageNum, 10));
+          }
+        }
+      });
+    }, { root: container, rootMargin: '800px 0px' });
+
+    async function renderPageOnCanvas(canvas, pageNum) {
+      try {
+        const page = await currentPdf.getPage(pageNum);
+        const context = canvas.getContext('2d');
+        const screenWidth = Math.min(window.innerWidth - 16, 800);
+        const unscaledViewport = page.getViewport({ scale: 1 });
+        const scale = screenWidth / unscaledViewport.width;
+        const viewport = page.getViewport({ scale: scale * window.devicePixelRatio });
+        
+        await page.render({ canvasContext: context, viewport: viewport }).promise;
+      } catch (e) {
+        console.error("Error rendering page", pageNum, e);
+      }
+    }
+
     async function openBook(book) {
       currentBookId = book.id;
+      isRestoring = true; 
       document.getElementById('shelf-view').style.display = 'none';
       document.getElementById('reader').style.display = 'flex';
       container.innerHTML = '';
       loadingMsg.style.display = 'block';
 
       try {
-        const pdf = await pdfjsLib.getDocument(encodeURI(book.file)).promise;
+        currentPdf = await pdfjsLib.getDocument(encodeURI(book.file)).promise;
         loadingMsg.style.display = 'none';
 
-        // Render each page into the scrolling view
-        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-          const page = await pdf.getPage(pageNum);
-          const unscaledViewport = page.getViewport({ scale: 1 });
-          
-          // Match the canvas cleanly to the device's screen width
-          const screenWidth = Math.min(window.innerWidth - 16, 800);
-          const scale = screenWidth / unscaledViewport.width;
-          const viewport = page.getViewport({ scale: scale * window.devicePixelRatio });
+        // 3. Get the size of page 1 to use as a template for all pages
+        const screenWidth = Math.min(window.innerWidth - 16, 800);
+        const page1 = await currentPdf.getPage(1);
+        const unscaledViewport = page1.getViewport({ scale: 1 });
+        const scale = screenWidth / unscaledViewport.width;
+        const viewport = page1.getViewport({ scale: scale * window.devicePixelRatio });
 
+        // Instantly build blank canvases for the entire book so the scroll height is correct
+        for (let pageNum = 1; pageNum <= currentPdf.numPages; pageNum++) {
           const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
           canvas.height = viewport.height;
           canvas.width = viewport.width;
           canvas.style.width = `${viewport.width / window.devicePixelRatio}px`;
+          canvas.dataset.pageNum = pageNum;
           
           container.appendChild(canvas);
-
-          await page.render({
-            canvasContext: context,
-            viewport: viewport
-          }).promise;
+          observer.observe(canvas); // Tell observer to load this page when scrolled to
         }
 
-        // Restore last reading position
-        const savedScroll = localStorage.getItem(`scroll_${currentBookId}`);
-        if (savedScroll) {
-          container.scrollTop = parseInt(savedScroll, 10);
-        }
+        // 4. Instantly jump to the saved scroll position
+        setTimeout(() => {
+          const savedScroll = localStorage.getItem(`scroll_${currentBookId}`);
+          if (savedScroll) {
+            container.scrollTop = parseInt(savedScroll, 10);
+          }
+          setTimeout(() => { isRestoring = false; }, 200);
+        }, 100);
+
       } catch (err) {
-        loadingMsg.innerText = "Error opening book. Please check that the PDF file name matches exactly.";
+        loadingMsg.innerText = "Error opening book.";
         console.error(err);
       }
     }
@@ -208,6 +239,7 @@
       document.getElementById('shelf-view').style.display = 'block';
       container.innerHTML = '';
       currentBookId = null;
+      currentPdf = null;
     }
 
     renderShelf();
