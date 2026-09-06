@@ -6,6 +6,8 @@
   <title>Books of Switzerland</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#d52b1e">
+  <!-- PDF rendering library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -38,65 +40,111 @@
     .book-card {
       background: #ffffff;
       border-radius: 14px;
-      padding: 20px;
+      padding: 24px 20px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.1s ease;
     }
-    .book-link {
-      text-decoration: none;
-      color: #1a1a1a;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
+    .book-card:active {
+      transform: scale(0.98);
+      background: #f7f7f7;
     }
     .book-title {
       font-size: 22px;
       font-weight: 700;
+      color: #1a1a1a;
       line-height: 1.3;
     }
-    .read-prompt {
-      font-size: 15px;
-      font-weight: 600;
-      color: #d52b1e;
+
+    /* Reader View */
+    #reader-view {
+      display: none;
+      min-height: 100vh;
+      background-color: #525659;
+      flex-direction: column;
     }
-    .card-footer {
+    #reader-header {
+      position: sticky;
+      top: 0;
+      z-index: 999;
+      background: #ffffff;
+      padding: 12px 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      border-top: 1px solid #eee;
-      padding-top: 12px;
-      margin-top: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
-    .page-indicator {
-      font-size: 15px;
-      color: #555;
-    }
-    .set-page-btn {
-      background: #f0f0f0;
-      border: 1px solid #ccc;
-      padding: 6px 12px;
+    .back-btn {
+      background: #d52b1e;
+      color: #ffffff;
+      border: none;
+      padding: 10px 18px;
+      font-size: 17px;
+      font-weight: 700;
       border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      color: #333;
       cursor: pointer;
     }
-    .set-page-btn:active {
-      background: #ddd;
+    .back-btn:active {
+      background: #a81c12;
+    }
+    #book-active-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 55%;
+    }
+    #canvas-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0 60px 0;
+      width: 100%;
+    }
+    canvas {
+      width: 96% !important;
+      max-width: 800px !important;
+      height: auto !important;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      background: #ffffff;
+      border-radius: 4px;
+    }
+    #loading-notice {
+      color: #ffffff;
+      font-size: 18px;
+      font-weight: 600;
+      margin-top: 40px;
     }
   </style>
 </head>
 <body>
 
-  <header>
-    <h1>Books of Switzerland</h1>
-  </header>
+  <!-- Bookshelf Screen -->
+  <div id="shelf-view">
+    <header>
+      <h1>Books of Switzerland</h1>
+    </header>
+    <main id="shelf"></main>
+  </div>
 
-  <main id="shelf"></main>
+  <!-- Reader Screen -->
+  <div id="reader-view">
+    <div id="reader-header">
+      <button class="back-btn" onclick="closeBook()">← Books</button>
+      <div id="book-active-title"></div>
+    </div>
+    <div id="canvas-container">
+      <div id="loading-notice">Opening book...</div>
+    </div>
+  </div>
 
   <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
     const books = [
       { id: "book1", title: "Swiss Fairy Tales", file: "Swiss Fairy Tales by William Elliot Griffis.pdf" },
       { id: "book2", title: "Heidi", file: "Heidi by Johanna Spyri.pdf" },
@@ -104,43 +152,77 @@
       { id: "book4", title: "The Story of Switzerland", file: "The Story of Switzerland by Lina Hug.pdf" }
     ];
 
+    let currentBookId = null;
+    let scrollSaveTimer = null;
+
+    // Track scroll automatically
+    window.addEventListener('scroll', () => {
+      if (!currentBookId) return;
+      clearTimeout(scrollSaveTimer);
+      scrollSaveTimer = setTimeout(() => {
+        localStorage.setItem(`scroll_pos_${currentBookId}`, window.scrollY);
+      }, 300);
+    });
+
     function renderShelf() {
       const shelf = document.getElementById('shelf');
       shelf.innerHTML = '';
-
       books.forEach(book => {
-        const savedPage = localStorage.getItem(`read_page_${book.id}`) || 1;
-        const encodedUrl = `${encodeURI(book.file)}#page=${savedPage}`;
-
         const card = document.createElement('div');
         card.className = 'book-card';
-
-        card.innerHTML = `
-          <a class="book-link" href="${encodedUrl}">
-            <div class="book-title">${book.title}</div>
-            <div class="read-prompt">Tap to Read →</div>
-          </a>
-          <div class="card-footer">
-            <span class="page-indicator">Bookmark: Page ${savedPage}</span>
-            <button class="set-page-btn" onclick="updatePage('${book.id}')">Update Page</button>
-          </div>
-        `;
-
+        card.onclick = () => openBook(book);
+        card.innerHTML = `<div class="book-title">${book.title}</div>`;
         shelf.appendChild(card);
       });
     }
 
-    function updatePage(bookId) {
-      const currentPage = localStorage.getItem(`read_page_${bookId}`) || 1;
-      const userEntry = prompt("What page did you leave off on?", currentPage);
-      
-      if (userEntry !== null) {
-        const parsed = parseInt(userEntry, 10);
-        if (!isNaN(parsed) && parsed > 0) {
-          localStorage.setItem(`read_page_${bookId}`, parsed);
-          renderShelf();
+    async function openBook(book) {
+      currentBookId = book.id;
+      document.getElementById('shelf-view').style.display = 'none';
+      document.getElementById('reader-view').style.display = 'flex';
+      document.getElementById('book-active-title').innerText = book.title;
+
+      const container = document.getElementById('canvas-container');
+      container.innerHTML = '<div id="loading-notice">Opening book...</div>';
+
+      try {
+        const loadingTask = pdfjsLib.getDocument(encodeURI(book.file));
+        const pdf = await loadingTask.promise;
+        container.innerHTML = '';
+
+        // Render each page continuously
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+          const page = await pdf.getPage(pageNum);
+          // Scale 2 gives crisp text when zoomed
+          const viewport = page.getViewport({ scale: 2 });
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+
+          await page.render({ canvasContext: context, viewport: viewport }).promise;
+          container.appendChild(canvas);
         }
+
+        // Silently restore her exact reading spot
+        const savedScroll = localStorage.getItem(`scroll_pos_${currentBookId}`);
+        if (savedScroll) {
+          window.scrollTo(0, parseInt(savedScroll, 10));
+        }
+      } catch (err) {
+        container.innerHTML = '<div id="loading-notice">Error loading book file.</div>';
       }
+    }
+
+    function closeBook() {
+      if (currentBookId) {
+        localStorage.setItem(`scroll_pos_${currentBookId}`, window.scrollY);
+      }
+      currentBookId = null;
+      document.getElementById('reader-view').style.display = 'none';
+      document.getElementById('shelf-view').style.display = 'block';
+      document.getElementById('canvas-container').innerHTML = '';
+      window.scrollTo(0, 0);
     }
 
     renderShelf();
