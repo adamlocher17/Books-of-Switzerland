@@ -16,7 +16,7 @@
       color: #2c2c2c;
     }
     header {
-      padding: 40px 20px 20px;
+      padding: 36px 20px 16px;
       text-align: center;
     }
     h1 {
@@ -38,22 +38,53 @@
     .book-card {
       background: #ffffff;
       border-radius: 14px;
-      padding: 24px 20px;
+      padding: 20px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      cursor: pointer;
-      text-decoration: none;
-      display: block;
-      transition: transform 0.1s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
-    .book-card:active {
-      transform: scale(0.98);
-      background: #f7f7f7;
+    .book-link {
+      text-decoration: none;
+      color: #1a1a1a;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
     .book-title {
       font-size: 22px;
       font-weight: 700;
-      color: #1a1a1a;
       line-height: 1.3;
+    }
+    .read-prompt {
+      font-size: 15px;
+      font-weight: 600;
+      color: #d52b1e;
+    }
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid #eee;
+      padding-top: 12px;
+      margin-top: 4px;
+    }
+    .page-indicator {
+      font-size: 15px;
+      color: #555;
+    }
+    .set-page-btn {
+      background: #f0f0f0;
+      border: 1px solid #ccc;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      cursor: pointer;
+    }
+    .set-page-btn:active {
+      background: #ddd;
     }
   </style>
 </head>
@@ -73,14 +104,46 @@
       { id: "book4", title: "The Story of Switzerland", file: "The Story of Switzerland by Lina Hug.pdf" }
     ];
 
-    const shelf = document.getElementById('shelf');
-    books.forEach(book => {
-      const link = document.createElement('a');
-      link.className = 'book-card';
-      link.href = encodeURI(book.file);
-      link.innerHTML = `<div class="book-title">${book.title}</div>`;
-      shelf.appendChild(link);
-    });
+    function renderShelf() {
+      const shelf = document.getElementById('shelf');
+      shelf.innerHTML = '';
+
+      books.forEach(book => {
+        const savedPage = localStorage.getItem(`read_page_${book.id}`) || 1;
+        const encodedUrl = `${encodeURI(book.file)}#page=${savedPage}`;
+
+        const card = document.createElement('div');
+        card.className = 'book-card';
+
+        card.innerHTML = `
+          <a class="book-link" href="${encodedUrl}">
+            <div class="book-title">${book.title}</div>
+            <div class="read-prompt">Tap to Read →</div>
+          </a>
+          <div class="card-footer">
+            <span class="page-indicator">Bookmark: Page ${savedPage}</span>
+            <button class="set-page-btn" onclick="updatePage('${book.id}')">Update Page</button>
+          </div>
+        `;
+
+        shelf.appendChild(card);
+      });
+    }
+
+    function updatePage(bookId) {
+      const currentPage = localStorage.getItem(`read_page_${bookId}`) || 1;
+      const userEntry = prompt("What page did you leave off on?", currentPage);
+      
+      if (userEntry !== null) {
+        const parsed = parseInt(userEntry, 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          localStorage.setItem(`read_page_${bookId}`, parsed);
+          renderShelf();
+        }
+      }
+    }
+
+    renderShelf();
   </script>
 </body>
 </html>
