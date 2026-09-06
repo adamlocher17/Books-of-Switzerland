@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>My Books</title>
+  <title>Books of Switzerland</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#f7f5f0">
   <style>
@@ -111,7 +111,7 @@
 
   <div id="shelf-view">
     <header>
-      <h1>Grandma's Library</h1>
+      <h1>Books of Switzerland</h1>
     </header>
     <main id="shelf"></main>
   </div>
@@ -128,13 +128,12 @@
   </div>
 
   <script>
-    // 1. Add your books here
     const books = [
-  { id: "book1", title: "Swiss Fairy Tales", file: "Swiss Fairy Tales by William Elliot Griffis.pdf" },
-  { id: "book2", title: "Heidi", file: "Heidi by Johanna Spyri.pdf" },
-  { id: "book3", title: "Constitution of Switzerland", file: "Constitution of Switzerland.pdf" },
-  { id: "book4", title: "The Story of Switzerland", file: "The Story of Switzerland by Lina Hug.pdf" }  
-];
+      { id: "book1", title: "Swiss Fairy Tales", file: "Swiss Fairy Tales by William Elliot Griffis.pdf" },
+      { id: "book2", title: "Heidi", file: "Heidi by Johanna Spyri.pdf" },
+      { id: "book3", title: "Constitution of Switzerland", file: "Constitution of Switzerland.pdf" },
+      { id: "book4", title: "The Story of Switzerland", file: "The Story of Switzerland by Lina Hug.pdf" }
+    ];
 
     let currentBookId = null;
 
@@ -157,11 +156,8 @@
     function openBook(book) {
       currentBookId = book.id;
       const savedPage = localStorage.getItem(`read_page_${book.id}`) || 1;
-      
       document.getElementById('page-input').value = savedPage;
-      // Standard browsers jump to page using the hash #page=X
-      document.getElementById('pdf-frame').src = `${book.file}#page=${savedPage}`;
-      
+      document.getElementById('pdf-frame').src = `${encodeURI(book.file)}#page=${savedPage}`;
       document.getElementById('reader').style.display = 'flex';
       document.getElementById('shelf-view').style.display = 'none';
     }
@@ -171,7 +167,7 @@
       const page = parseInt(pageNumber, 10) || 1;
       localStorage.setItem(`read_page_${currentBookId}`, page);
       const book = books.find(b => b.id === currentBookId);
-      document.getElementById('pdf-frame').src = `${book.file}#page=${page}`;
+      document.getElementById('pdf-frame').src = `${encodeURI(book.file)}#page=${page}`;
     }
 
     function closeReader() {
