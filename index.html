@@ -2,12 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
   <title>Books of Switzerland</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#d52b1e">
-  <!-- Load PDF.js engine -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -18,12 +16,12 @@
       color: #2c2c2c;
     }
     header {
-      padding: 36px 20px 20px;
+      padding: 40px 20px 20px;
       text-align: center;
     }
     h1 {
       margin: 0;
-      font-size: 30px;
+      font-size: 32px;
       font-weight: 800;
       color: #ffffff;
       letter-spacing: 0.5px;
@@ -40,93 +38,34 @@
     .book-card {
       background: #ffffff;
       border-radius: 14px;
-      padding: 22px 20px;
+      padding: 24px 20px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       cursor: pointer;
-      border: none;
+      text-decoration: none;
+      display: block;
+      transition: transform 0.1s ease;
     }
     .book-card:active {
+      transform: scale(0.98);
       background: #f7f7f7;
     }
     .book-title {
-      font-size: 20px;
+      font-size: 22px;
       font-weight: 700;
       color: #1a1a1a;
       line-height: 1.3;
-    }
-    #reader {
-      position: fixed;
-      inset: 0;
-      background: #525659;
-      display: none;
-      flex-direction: column;
-      z-index: 100;
-    }
-    #top-bar {
-      display: flex;
-      align-items: center;
-      padding: 12px 16px;
-      background: #ffffff;
-      border-bottom: 1px solid #ddd;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-    .nav-btn {
-      font-size: 17px;
-      font-weight: 700;
-      background: #d52b1e;
-      color: #fff;
-      border: none;
-      padding: 10px 18px;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-    #loading-msg {
-      color: #fff;
-      font-size: 18px;
-      text-align: center;
-      padding: 20px;
-      display: none;
-    }
-    #pdf-container {
-      flex: 1;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 12px 8px;
-      gap: 12px;
-    }
-    canvas {
-      max-width: 100%;
-      height: auto !important;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-      background: #fff;
     }
   </style>
 </head>
 <body>
 
-  <div id="shelf-view">
-    <header>
-      <h1>Books of Switzerland</h1>
-    </header>
-    <main id="shelf"></main>
-  </div>
+  <header>
+    <h1>Books of Switzerland</h1>
+  </header>
 
-  <div id="reader">
-    <div id="top-bar">
-      <button class="nav-btn" onclick="closeReader()">← Books</button>
-    </div>
-    <div id="loading-msg">Loading book...</div>
-    <div id="pdf-container"></div>
-  </div>
+  <main id="shelf"></main>
 
   <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
     const books = [
       { id: "book1", title: "Swiss Fairy Tales", file: "Swiss Fairy Tales by William Elliot Griffis.pdf" },
       { id: "book2", title: "Heidi", file: "Heidi by Johanna Spyri.pdf" },
@@ -134,115 +73,14 @@
       { id: "book4", title: "The Story of Switzerland", file: "The Story of Switzerland by Lina Hug.pdf" }
     ];
 
-    let currentBookId = null;
-    let isRestoring = false;
-    let currentPdf = null;
-    
-    const container = document.getElementById('pdf-container');
-    const loadingMsg = document.getElementById('loading-msg');
-
-    // 1. Save scroll position (unless the book is currently loading)
-    container.addEventListener('scroll', () => {
-      if (currentBookId && !isRestoring) {
-        localStorage.setItem(`scroll_${currentBookId}`, container.scrollTop);
-      }
+    const shelf = document.getElementById('shelf');
+    books.forEach(book => {
+      const link = document.createElement('a');
+      link.className = 'book-card';
+      link.href = encodeURI(book.file);
+      link.innerHTML = `<div class="book-title">${book.title}</div>`;
+      shelf.appendChild(link);
     });
-
-    function renderShelf() {
-      const shelf = document.getElementById('shelf');
-      shelf.innerHTML = '';
-      books.forEach(book => {
-        const card = document.createElement('div');
-        card.className = 'book-card';
-        card.onclick = () => openBook(book);
-        card.innerHTML = `<div class="book-title">${book.title}</div>`;
-        shelf.appendChild(card);
-      });
-    }
-
-    // 2. Lazy Loader: Only draws the pages that are currently on the screen
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          const canvas = entry.target;
-          if (!canvas.dataset.rendered && currentPdf) {
-            canvas.dataset.rendered = "true";
-            renderPageOnCanvas(canvas, parseInt(canvas.dataset.pageNum, 10));
-          }
-        }
-      });
-    }, { root: container, rootMargin: '800px 0px' });
-
-    async function renderPageOnCanvas(canvas, pageNum) {
-      try {
-        const page = await currentPdf.getPage(pageNum);
-        const context = canvas.getContext('2d');
-        const screenWidth = Math.min(window.innerWidth - 16, 800);
-        const unscaledViewport = page.getViewport({ scale: 1 });
-        const scale = screenWidth / unscaledViewport.width;
-        const viewport = page.getViewport({ scale: scale * window.devicePixelRatio });
-        
-        await page.render({ canvasContext: context, viewport: viewport }).promise;
-      } catch (e) {
-        console.error("Error rendering page", pageNum, e);
-      }
-    }
-
-    async function openBook(book) {
-      currentBookId = book.id;
-      isRestoring = true; 
-      document.getElementById('shelf-view').style.display = 'none';
-      document.getElementById('reader').style.display = 'flex';
-      container.innerHTML = '';
-      loadingMsg.style.display = 'block';
-
-      try {
-        currentPdf = await pdfjsLib.getDocument(encodeURI(book.file)).promise;
-        loadingMsg.style.display = 'none';
-
-        // 3. Get the size of page 1 to use as a template for all pages
-        const screenWidth = Math.min(window.innerWidth - 16, 800);
-        const page1 = await currentPdf.getPage(1);
-        const unscaledViewport = page1.getViewport({ scale: 1 });
-        const scale = screenWidth / unscaledViewport.width;
-        const viewport = page1.getViewport({ scale: scale * window.devicePixelRatio });
-
-        // Instantly build blank canvases for the entire book so the scroll height is correct
-        for (let pageNum = 1; pageNum <= currentPdf.numPages; pageNum++) {
-          const canvas = document.createElement('canvas');
-          canvas.height = viewport.height;
-          canvas.width = viewport.width;
-          canvas.style.width = `${viewport.width / window.devicePixelRatio}px`;
-          canvas.dataset.pageNum = pageNum;
-          
-          container.appendChild(canvas);
-          observer.observe(canvas); // Tell observer to load this page when scrolled to
-        }
-
-        // 4. Instantly jump to the saved scroll position
-        setTimeout(() => {
-          const savedScroll = localStorage.getItem(`scroll_${currentBookId}`);
-          if (savedScroll) {
-            container.scrollTop = parseInt(savedScroll, 10);
-          }
-          setTimeout(() => { isRestoring = false; }, 200);
-        }, 100);
-
-      } catch (err) {
-        loadingMsg.innerText = "Error opening book.";
-        console.error(err);
-      }
-    }
-
-    function closeReader() {
-      document.getElementById('reader').style.display = 'none';
-      document.getElementById('shelf-view').style.display = 'block';
-      container.innerHTML = '';
-      currentBookId = null;
-      currentPdf = null;
-    }
-
-    renderShelf();
   </script>
 </body>
 </html>
