@@ -6,13 +6,15 @@
   <title>Books of Switzerland</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#d52b1e">
+  <!-- Load PDF.js engine -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body {
       margin: 0;
       padding: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: #d52b1e; /* Swiss Red */
+      background-color: #d52b1e;
       color: #2c2c2c;
     }
     header {
@@ -42,10 +44,8 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       cursor: pointer;
       border: none;
-      transition: transform 0.1s ease;
     }
     .book-card:active {
-      transform: scale(0.98);
       background: #f7f7f7;
     }
     .book-title {
@@ -57,7 +57,7 @@
     #reader {
       position: fixed;
       inset: 0;
-      background: #333;
+      background: #525659;
       display: none;
       flex-direction: column;
       z-index: 100;
@@ -68,6 +68,9 @@
       padding: 12px 16px;
       background: #ffffff;
       border-bottom: 1px solid #ddd;
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
     .nav-btn {
       font-size: 17px;
@@ -79,14 +82,28 @@
       border-radius: 8px;
       cursor: pointer;
     }
-    .nav-btn:active {
-      background: #a81c12;
+    #loading-msg {
+      color: #fff;
+      font-size: 18px;
+      text-align: center;
+      padding: 20px;
+      display: none;
     }
-    iframe {
+    #pdf-container {
       flex: 1;
-      border: none;
-      width: 100%;
-      height: 100%;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px 8px;
+      gap: 12px;
+    }
+    canvas {
+      max-width: 100%;
+      height: auto !important;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      background: #fff;
     }
   </style>
 </head>
@@ -103,16 +120,30 @@
     <div id="top-bar">
       <button class="nav-btn" onclick="closeReader()">← Books</button>
     </div>
-    <iframe id="pdf-frame" title="PDF Reader"></iframe>
+    <div id="loading-msg">Loading book...</div>
+    <div id="pdf-container"></div>
   </div>
 
   <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
     const books = [
       { id: "book1", title: "Swiss Fairy Tales", file: "Swiss Fairy Tales by William Elliot Griffis.pdf" },
       { id: "book2", title: "Heidi", file: "Heidi by Johanna Spyri.pdf" },
       { id: "book3", title: "Constitution of Switzerland", file: "Constitution of Switzerland.pdf" },
       { id: "book4", title: "The Story of Switzerland", file: "The Story of Switzerland by Lina Hug.pdf" }
     ];
+
+    let currentBookId = null;
+    const container = document.getElementById('pdf-container');
+    const loadingMsg = document.getElementById('loading-msg');
+
+    // Save scroll position automatically while reading
+    container.addEventListener('scroll', () => {
+      if (currentBookId) {
+        localStorage.setItem(`scroll_${currentBookId}`, container.scrollTop);
+      }
+    });
 
     function renderShelf() {
       const shelf = document.getElementById('shelf');
@@ -126,20 +157,57 @@
       });
     }
 
-    function openBook(book) {
-      // Uses Mozilla's standard mobile PDF viewer engine to enable full scrolling
-      const fullPdfUrl = window.location.origin + window.location.pathname.replace('index.html', '') + encodeURI(book.file);
-      const viewerUrl = `https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(fullPdfUrl)}`;
-
-      document.getElementById('pdf-frame').src = viewerUrl;
-      document.getElementById('reader').style.display = 'flex';
+    async function openBook(book) {
+      currentBookId = book.id;
       document.getElementById('shelf-view').style.display = 'none';
+      document.getElementById('reader').style.display = 'flex';
+      container.innerHTML = '';
+      loadingMsg.style.display = 'block';
+
+      try {
+        const pdf = await pdfjsLib.getDocument(encodeURI(book.file)).promise;
+        loadingMsg.style.display = 'none';
+
+        // Render each page into the scrolling view
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+          const page = await pdf.getPage(pageNum);
+          const unscaledViewport = page.getViewport({ scale: 1 });
+          
+          // Match the canvas cleanly to the device's screen width
+          const screenWidth = Math.min(window.innerWidth - 16, 800);
+          const scale = screenWidth / unscaledViewport.width;
+          const viewport = page.getViewport({ scale: scale * window.devicePixelRatio });
+
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+          canvas.style.width = `${viewport.width / window.devicePixelRatio}px`;
+          
+          container.appendChild(canvas);
+
+          await page.render({
+            canvasContext: context,
+            viewport: viewport
+          }).promise;
+        }
+
+        // Restore last reading position
+        const savedScroll = localStorage.getItem(`scroll_${currentBookId}`);
+        if (savedScroll) {
+          container.scrollTop = parseInt(savedScroll, 10);
+        }
+      } catch (err) {
+        loadingMsg.innerText = "Error opening book. Please check that the PDF file name matches exactly.";
+        console.error(err);
+      }
     }
 
     function closeReader() {
       document.getElementById('reader').style.display = 'none';
       document.getElementById('shelf-view').style.display = 'block';
-      document.getElementById('pdf-frame').src = '';
+      container.innerHTML = '';
+      currentBookId = null;
     }
 
     renderShelf();
