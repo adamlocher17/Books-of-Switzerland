@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>My Books</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#f7f5f0">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #f7f5f0;
+      color: #2c2c2c;
+    }
+    header {
+      padding: 24px 20px 12px;
+      text-align: center;
+    }
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 700;
+    }
+    #shelf {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .book-card {
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.06);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      cursor: pointer;
+      border: 1px solid #e2ded5;
+      text-align: left;
+    }
+    .book-card:active {
+      background: #eeebe3;
+    }
+    .book-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+    .book-meta {
+      font-size: 15px;
+      color: #666;
+    }
+    #reader {
+      position: fixed;
+      inset: 0;
+      background: #fff;
+      display: none;
+      flex-direction: column;
+      z-index: 100;
+    }
+    #top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #eeebe3;
+      border-bottom: 1px solid #d5d0c4;
+    }
+    .nav-btn {
+      font-size: 18px;
+      font-weight: 600;
+      background: #2c2c2c;
+      color: #fff;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .nav-btn:active {
+      background: #444;
+    }
+    #page-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 16px;
+    }
+    #page-input {
+      width: 50px;
+      font-size: 16px;
+      text-align: center;
+      padding: 6px;
+      border: 1px solid #aaa;
+      border-radius: 6px;
+    }
+    iframe {
+      flex: 1;
+      border: none;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="shelf-view">
+    <header>
+      <h1>Grandma's Library</h1>
+    </header>
+    <main id="shelf"></main>
+  </div>
+
+  <div id="reader">
+    <div id="top-bar">
+      <button class="nav-btn" onclick="closeReader()">← Books</button>
+      <div id="page-controls">
+        <label for="page-input">Page:</label>
+        <input type="number" id="page-input" min="1" onchange="jumpToPage(this.value)">
+      </div>
+    </div>
+    <iframe id="pdf-frame" title="PDF Viewer"></iframe>
+  </div>
+
+  <script>
+    // 1. Add your books here
+    const books = [
+  { id: "book1", title: "Swiss Fairy Tales", file: "Swiss Fairy Tales by William Elliot Griffis.pdf" },
+  { id: "book2", title: "Heidi", file: "Heidi by Johanna Spyri.pdf" }
+  { id: "book3", title: "Constitution of Switzerland", file: "Constitution of Switzerland.pdf" }
+  { id: "book4", title: "The Story of Switzerland", file: "The Story of Switzerland by Lina Hug.pdf" }  
+];;
+
+    let currentBookId = null;
+
+    function renderShelf() {
+      const shelf = document.getElementById('shelf');
+      shelf.innerHTML = '';
+      books.forEach(book => {
+        const savedPage = localStorage.getItem(`read_page_${book.id}`) || 1;
+        const card = document.createElement('div');
+        card.className = 'book-card';
+        card.onclick = () => openBook(book);
+        card.innerHTML = `
+          <div class="book-title">${book.title}</div>
+          <div class="book-meta">Last read: Page ${savedPage}</div>
+        `;
+        shelf.appendChild(card);
+      });
+    }
+
+    function openBook(book) {
+      currentBookId = book.id;
+      const savedPage = localStorage.getItem(`read_page_${book.id}`) || 1;
+      
+      document.getElementById('page-input').value = savedPage;
+      // Standard browsers jump to page using the hash #page=X
+      document.getElementById('pdf-frame').src = `${book.file}#page=${savedPage}`;
+      
+      document.getElementById('reader').style.display = 'flex';
+      document.getElementById('shelf-view').style.display = 'none';
+    }
+
+    function jumpToPage(pageNumber) {
+      if (!currentBookId) return;
+      const page = parseInt(pageNumber, 10) || 1;
+      localStorage.setItem(`read_page_${currentBookId}`, page);
+      const book = books.find(b => b.id === currentBookId);
+      document.getElementById('pdf-frame').src = `${book.file}#page=${page}`;
+    }
+
+    function closeReader() {
+      document.getElementById('reader').style.display = 'none';
+      document.getElementById('shelf-view').style.display = 'block';
+      document.getElementById('pdf-frame').src = '';
+      currentBookId = null;
+      renderShelf();
+    }
+
+    renderShelf();
+  </script>
+</body>
+</html>
