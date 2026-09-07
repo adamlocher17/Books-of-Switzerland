@@ -57,6 +57,36 @@
       line-height: 1.3;
     }
 
+    /* Birthday Message Card */
+    .message-card {
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 28px 22px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      margin-top: 8px;
+      margin-bottom: 30px;
+      line-height: 1.6;
+      color: #2c2c2c;
+    }
+    .message-title {
+      font-size: 24px;
+      font-weight: 800;
+      color: #d52b1e;
+      margin-bottom: 14px;
+      text-align: center;
+    }
+    .message-body {
+      font-size: 17px;
+      margin-bottom: 14px;
+    }
+    .message-signoff {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1a1a1a;
+      text-align: right;
+      margin-top: 16px;
+    }
+
     /* Reader View */
     #reader-view {
       display: none;
@@ -128,7 +158,26 @@
     <header>
       <h1>Books of Switzerland</h1>
     </header>
-    <main id="shelf"></main>
+    <main id="shelf">
+      <div id="book-list" style="display: flex; flex-direction: column; gap: 16px;"></div>
+
+      <!-- Birthday Card -->
+      <section class="message-card">
+        <div class="message-title">Happy Birthday Gamu!</div>
+        <div class="message-body">
+          You have been my best friend, my happiness, and my safe space since birth! Thank you for your joy, your laughter, your wisdom, your genius, your open-mind, your positivity, and your example!
+        </div>
+        <div class="message-body">
+          Thank you so much for everything you do for us. You have been an anchor for so many generations both before and after you! There will never be another like you, and I’m so blessed you are my grandmother!
+        </div>
+        <div class="message-body">
+          Thank you so much for your loving heart, that loves and accepts everyone! You mean the world to all of us! Thank you for making my life so much more wonderful!
+        </div>
+        <div class="message-signoff">
+          Love you forever!<br>Adam
+        </div>
+      </section>
+    </main>
   </div>
 
   <!-- Reader Screen -->
@@ -165,14 +214,14 @@
     });
 
     function renderShelf() {
-      const shelf = document.getElementById('shelf');
-      shelf.innerHTML = '';
+      const list = document.getElementById('book-list');
+      list.innerHTML = '';
       books.forEach(book => {
         const card = document.createElement('div');
         card.className = 'book-card';
         card.onclick = () => openBook(book);
         card.innerHTML = `<div class="book-title">${book.title}</div>`;
-        shelf.appendChild(card);
+        list.appendChild(card);
       });
     }
 
@@ -190,10 +239,8 @@
         const pdf = await loadingTask.promise;
         container.innerHTML = '';
 
-        // Render each page continuously
         for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
           const page = await pdf.getPage(pageNum);
-          // Scale 2 gives crisp text when zoomed
           const viewport = page.getViewport({ scale: 2 });
           const canvas = document.createElement('canvas');
           const context = canvas.getContext('2d');
@@ -204,7 +251,6 @@
           container.appendChild(canvas);
         }
 
-        // Silently restore her exact reading spot
         const savedScroll = localStorage.getItem(`scroll_pos_${currentBookId}`);
         if (savedScroll) {
           window.scrollTo(0, parseInt(savedScroll, 10));
