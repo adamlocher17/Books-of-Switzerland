@@ -35,7 +35,21 @@
       padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 20px;
+    }
+    .category-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .category-label {
+      font-size: 16px;
+      font-weight: 700;
+      color: #ffffff;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding-left: 4px;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.2);
     }
     .book-card {
       background: #ffffff;
@@ -63,7 +77,7 @@
       border-radius: 14px;
       padding: 28px 22px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      margin-top: 8px;
+      margin-top: 10px;
       margin-bottom: 30px;
       line-height: 1.6;
       color: #2c2c2c;
@@ -159,7 +173,7 @@
       <h1>Books of Switzerland</h1>
     </header>
     <main id="shelf">
-      <div id="book-list" style="display: flex; flex-direction: column; gap: 16px;"></div>
+      <div id="book-list" style="display: flex; flex-direction: column; gap: 20px;"></div>
 
       <!-- Birthday Card -->
       <section class="message-card">
@@ -195,10 +209,10 @@
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
     const books = [
-      { id: "book1", title: "Swiss Fairy Tales", file: "Swiss Fairy Tales by William Elliot Griffis.pdf" },
-      { id: "book2", title: "Heidi", file: "Heidi by Johanna Spyri.pdf" },
-      { id: "book3", title: "Constitution of Switzerland", file: "Constitution of Switzerland.pdf" },
-      { id: "book4", title: "The Story of Switzerland", file: "The Story of Switzerland by Lina Hug.pdf" }
+      { id: "book1", category: "Folklore:", title: "Swiss Fairy Tales", file: "Swiss Fairy Tales by William Elliot Griffis.pdf" },
+      { id: "book2", category: "Literature:", title: "Heidi", file: "Heidi by Johanna Spyri.pdf" },
+      { id: "book3", category: "Politics:", title: "Constitution of Switzerland", file: "Constitution of Switzerland.pdf" },
+      { id: "book4", category: "History:", title: "The Story of Switzerland", file: "The Story of Switzerland by Lina Hug.pdf" }
     ];
 
     let currentBookId = null;
@@ -217,12 +231,21 @@
       const list = document.getElementById('book-list');
       list.innerHTML = '';
       books.forEach(book => {
-        const card = document.createElement('div');
-        card.className = 'book-card';
-        card.onclick = () => openBook(book);
-        card.innerHTML = `<div class="book-title">${book.title}</div>`;
-        list.appendChild(card);
+        const group = document.createElement('div');
+        group.className = 'category-group';
+        group.innerHTML = `
+          <div class="category-label">${book.category}</div>
+          <div class="book-card" onclick="openBookById('${book.id}')">
+            <div class="book-title">${book.title}</div>
+          </div>
+        `;
+        list.appendChild(group);
       });
+    }
+
+    function openBookById(bookId) {
+      const book = books.find(b => b.id === bookId);
+      if (book) openBook(book);
     }
 
     async function openBook(book) {
