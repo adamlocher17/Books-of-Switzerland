@@ -40,15 +40,15 @@
     .category-group {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 8px;
     }
     .category-label {
-      font-size: 16px;
+      font-size: 17px;
       font-weight: 700;
       color: #ffffff;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      padding-left: 4px;
+      letter-spacing: 1.2px;
+      text-align: center;
       text-shadow: 0 1px 3px rgba(0,0,0,0.2);
     }
     .book-card {
@@ -59,6 +59,7 @@
       cursor: pointer;
       user-select: none;
       transition: transform 0.1s ease;
+      text-align: center;
     }
     .book-card:active {
       transform: scale(0.98);
@@ -69,6 +70,7 @@
       font-weight: 700;
       color: #1a1a1a;
       line-height: 1.3;
+      text-align: center;
     }
 
     /* Birthday Message Card */
@@ -218,7 +220,6 @@
     let currentBookId = null;
     let scrollSaveTimer = null;
 
-    // Track scroll automatically
     window.addEventListener('scroll', () => {
       if (!currentBookId) return;
       clearTimeout(scrollSaveTimer);
